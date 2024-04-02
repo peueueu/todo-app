@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "todo-app"
+version = "0.1.0"
+description = "This is a to-do app in fastapi"
+authors = ["Pedro Silva <silvasantospedro91@gmail.com>"]
+readme = "README.md"
+
+[tool.poetry.dependencies]
+python = "^3.12"
+sqlalchemy = "^2.0.29"
+pydantic-settings = "^2.2.1"
+fastapi = "^0.110.0"
+uvicorn = {extras = ["standard"], version = "^0.29.0"}
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
