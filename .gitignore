@@ -1,3 +1,4 @@
 *.env
 __pycache__
-todos.db
+todosapp.db
+.idea
