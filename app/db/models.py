@@ -1,5 +1,6 @@
+from sqlalchemy import Boolean, Column, ForeignKey, Integer, String
+
 from .database import Base
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
 
 
 class Users(Base):
@@ -12,6 +13,7 @@ class Users(Base):
     password = Column(String)
     is_active = Column(Boolean, default=True)
     role = Column(String)
+    phone_number = Column(String)
 
 
 class Todos(Base):
