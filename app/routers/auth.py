@@ -1,14 +1,21 @@
+from datetime import datetime, timedelta, timezone
 from typing import Annotated
 
 from bcrypt import checkpw, gensalt, hashpw
 from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordRequestForm
+from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from jwt import PyJWTError as JWTError
+from jwt import decode as jwt_decode
+from jwt import encode as jwt_encode
 from pydantic import BaseModel, Field
 
+from ..config.settings import settings
 from ..db.database import db_dependency
 from ..db.models import Users
 
-router = APIRouter(prefix="/auth")
+router = APIRouter(prefix="/auth", tags=["Auth"])
+
+oauth2_bearer = OAuth2PasswordBearer(tokenUrl="auth/signin")
 
 
 class CreateUserRequest(BaseModel):
@@ -20,6 +27,11 @@ class CreateUserRequest(BaseModel):
     role: str
 
 
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
 def authenticate_user(username: str, password: str, db: db_dependency):
     user = db.query(Users).filter(Users.username == username).first()
     if not user:
@@ -27,7 +39,39 @@ def authenticate_user(username: str, password: str, db: db_dependency):
     hashed_password = password.encode("utf-8")
     if not checkpw(hashed_password, user.password.encode("utf-8")):
         return False
-    return True
+    return user
+
+
+async def get_current_user(token: Annotated[str, Depends(oauth2_bearer)]):
+    try:
+        payload = jwt_decode(
+            token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM]
+        )
+        username: str = payload.get("sub")
+        user_id: int = payload.get("id")
+        if username is None or user_id is None:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials.",
+            )
+        return {"user_id": user_id, "username": username}
+    except JWTError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials.",
+        )
+
+
+def create_access_token(username: str, user_id: int, expires_delta: timedelta):
+    to_encode = {
+        "sub": username,
+        "id": user_id,
+        "iat": datetime.now(timezone.utc),
+        "exp": datetime.now(timezone.utc) + expires_delta,
+    }
+    return jwt_encode(
+        payload=to_encode, key=settings.SECRET_KEY, algorithm=settings.ALGORITHM
+    )
 
 
 @router.post("/signup", status_code=status.HTTP_201_CREATED)
@@ -50,7 +94,7 @@ async def create_user(db: db_dependency, create_user_request: CreateUserRequest)
     return create_user_model
 
 
-@router.post("/signin", status_code=status.HTTP_200_OK)
+@router.post("/signin", response_model=Token, status_code=status.HTTP_200_OK)
 async def signin(
     db: db_dependency, form_data: Annotated[OAuth2PasswordRequestForm, Depends()]
 ):
@@ -58,5 +102,11 @@ async def signin(
         username=form_data.username, password=form_data.password, db=db
     )
     if not user:
-        return "Failed Authentication"
-    return "Successful Authentication"
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not authenticate user.",
+        )
+    token = create_access_token(
+        username=user.username, user_id=user.id, expires_delta=timedelta(minutes=20)
+    )
+    return {"access_token": token, "token_type": "bearer"}

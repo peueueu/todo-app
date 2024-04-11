@@ -1,18 +1,11 @@
 from typing import Annotated
-from pydantic_settings import BaseSettings, SettingsConfigDict
-from sqlalchemy import create_engine
-from sqlalchemy.orm import sessionmaker
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import Session
+
 from fastapi import Depends
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import Session, sessionmaker
 
-
-class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env")
-    DATABASE_URL: str
-
-
-settings = Settings()
+from ..config.settings import settings
 
 engine = create_engine(
     url=settings.DATABASE_URL,
@@ -20,6 +13,7 @@ engine = create_engine(
         "check_same_thread": False,
     },
 )
+
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
